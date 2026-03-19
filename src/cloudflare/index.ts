@@ -27,23 +27,37 @@
 import type { Env, ExecutionContext, SecurityResult, HealthResponse } from "./types.js";
 import { SERVER_VERSION } from "./types.js";
 import { RateLimiter, createLogger, createAnalytics, type LogLevel } from "./utils/index.js";
+import {
+  handleProtectedResourceMetadata,
+  handleAuthorizationServerMetadata,
+  handleRegister,
+  handleAuthorizeGet,
+  handleAuthorizePost,
+  handleToken,
+  resolveToken,
+  getServerBase,
+} from "./oauth.js";
 
 // Re-export Durable Object classes for Wrangler
 export { McpSessionDO } from "./mcp-session.js";
 export { RateLimiterDO } from "./utils/rate-limiter.js";
 
 /**
- * Extract Fizzy token from request headers
- * Supports: Authorization: Bearer <token>
+ * Extract bearer token from Authorization header
  */
-function extractFizzyToken(request: Request): string | null {
+function extractBearerToken(request: Request): string | null {
   const authHeader = request.headers.get("Authorization");
-  
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.slice(7);
-  }
-  
-  return null;
+  return authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+}
+
+/**
+ * Resolve bearer token to a Fizzy PAT.
+ * Checks KV for OAuth-issued tokens first; falls back to treating the value
+ * as a raw Fizzy PAT (for direct Bearer usage and backwards compat).
+ */
+async function resolveFizzyToken(token: string, env: Env): Promise<string> {
+  const resolved = await resolveToken(token, env);
+  return resolved ?? token;
 }
 
 /**
@@ -136,11 +150,17 @@ function setSecurityHeaders(headers: Headers): void {
 function errorResponse(
   statusCode: number,
   message: string,
-  corsOrigin: string = "*"
+  corsOrigin: string = "*",
+  extraHeaders?: Record<string, string>
 ): Response {
   const headers = new Headers({ "Content-Type": "application/json" });
   setCorsHeaders(headers, corsOrigin);
   setSecurityHeaders(headers);
+  if (extraHeaders) {
+    for (const [k, v] of Object.entries(extraHeaders)) {
+      headers.set(k, v);
+    }
+  }
 
   return new Response(
     JSON.stringify({ error: message }),
@@ -194,16 +214,23 @@ async function handleMcp(
   env: Env,
   corsOrigin: string
 ): Promise<Response> {
-  // Extract Fizzy token from Authorization header
-  const fizzyToken = extractFizzyToken(request);
-  
-  if (!fizzyToken) {
+  const bearerToken = extractBearerToken(request);
+
+  if (!bearerToken) {
+    // Return WWW-Authenticate header so claude.ai triggers the OAuth flow
+    const resourceMetadataUrl = `${getServerBase(request)}/.well-known/oauth-protected-resource`;
     return errorResponse(
-      401, 
-      "Authorization required. Send your Fizzy Personal Access Token via: Authorization: Bearer <token>",
-      corsOrigin
+      401,
+      "Authorization required",
+      corsOrigin,
+      {
+        "WWW-Authenticate": `Bearer realm="fizzy-mcp", resource_metadata="${resourceMetadataUrl}"`,
+      }
     );
   }
+
+  // Resolve OAuth opaque token → Fizzy PAT (or use directly if raw PAT)
+  const fizzyToken = await resolveFizzyToken(bearerToken, env);
 
   // Get or create session ID
   let sessionId = request.headers.get("mcp-session-id");
@@ -285,6 +312,24 @@ export default {
       return errorResponse(500, "Server configuration error: Missing Durable Objects binding");
     }
 
+    // OAuth 2.0 discovery + authorization endpoints (no auth required)
+    if (path === "/.well-known/oauth-protected-resource" && request.method === "GET") {
+      return handleProtectedResourceMetadata(request);
+    }
+    if (path === "/.well-known/oauth-authorization-server" && request.method === "GET") {
+      return handleAuthorizationServerMetadata(request);
+    }
+    if (path === "/register" && request.method === "POST") {
+      return handleRegister(request, env);
+    }
+    if (path === "/authorize") {
+      if (request.method === "GET") return handleAuthorizeGet(request);
+      if (request.method === "POST") return handleAuthorizePost(request, env);
+    }
+    if (path === "/token" && request.method === "POST") {
+      return handleToken(request, env);
+    }
+
     // Handle health check (skip security for monitoring)
     if (path === "/health" && request.method === "GET") {
       const security = validateSecurity(request, env);
@@ -310,10 +355,11 @@ export default {
     }
 
     // Route to MCP handler (Streamable HTTP transport)
-    if (path === "/mcp") {
+    // Accept both /mcp and / as the MCP endpoint
+    if (path === "/mcp" || path === "/") {
       // Check rate limit if enabled
       if (env.RATE_LIMITER && env.ENABLE_RATE_LIMIT !== "false") {
-        const fizzyToken = extractFizzyToken(request);
+        const fizzyToken = extractBearerToken(request);
         if (fizzyToken) {
           const rateLimiter = new RateLimiter(env.RATE_LIMITER, {
             limit: parseInt(env.RATE_LIMIT_RPM || "10000", 10),
