@@ -43,9 +43,10 @@ export { McpSessionDO } from "./mcp-session.js";
 export { RateLimiterDO } from "./utils/rate-limiter.js";
 
 /**
- * Extract bearer token from Authorization header
+ * Extract Fizzy token from request headers
+ * Supports: Authorization: Bearer <token>
  */
-function extractBearerToken(request: Request): string | null {
+function extractFizzyToken(request: Request): string | null {
   const authHeader = request.headers.get("Authorization");
   return authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 }
@@ -214,7 +215,7 @@ async function handleMcp(
   env: Env,
   corsOrigin: string
 ): Promise<Response> {
-  const bearerToken = extractBearerToken(request);
+  const bearerToken = extractFizzyToken(request);
 
   if (!bearerToken) {
     // Return WWW-Authenticate header so claude.ai triggers the OAuth flow
@@ -355,11 +356,10 @@ export default {
     }
 
     // Route to MCP handler (Streamable HTTP transport)
-    // Accept both /mcp and / as the MCP endpoint
-    if (path === "/mcp" || path === "/") {
+    if (path === "/mcp") {
       // Check rate limit if enabled
       if (env.RATE_LIMITER && env.ENABLE_RATE_LIMIT !== "false") {
-        const fizzyToken = extractBearerToken(request);
+        const fizzyToken = extractFizzyToken(request);
         if (fizzyToken) {
           const rateLimiter = new RateLimiter(env.RATE_LIMITER, {
             limit: parseInt(env.RATE_LIMIT_RPM || "10000", 10),
