@@ -459,40 +459,42 @@ export const removeReactionSchema = z.object({
 
 // ============ Step schemas ============
 
-export const getStepSchema = z.object({
+const stepCardSelectorBase = z.object({
   account_slug: accountSlugSchema,
-  card_number: cardNumberSchema,
-  step_id: stepIdSchema,
+  card_id: cardIdSchema.optional(),
+  card_number: cardNumberSchema.optional(),
 });
 
-export const createStepSchema = z.object({
-  account_slug: accountSlugSchema,
-  card_number: cardNumberSchema,
-  content: z.string().describe(
-    "The to-do step content (required). Keep concise - steps are checklist items. " +
-    "Examples: 'Review PR', 'Update tests', 'Deploy to staging'. " +
-    "Steps are created as incomplete by default."
-  ),
-});
+export const getStepSchema = stepCardSelectorBase
+  .extend({ step_id: stepIdSchema })
+  .refine(cardSelectorRefinement, cardSelectorRefinementMessage);
 
-export const updateStepSchema = z.object({
-  account_slug: accountSlugSchema,
-  card_number: cardNumberSchema,
-  step_id: stepIdSchema,
-  content: z.string().optional().describe(
-    "New step content. Omit to keep current content unchanged."
-  ),
-  completed: z.boolean().optional().describe(
-    "Completion status. true = mark as complete/done, false = mark as incomplete/pending. " +
-    "Omit to keep current completion status. This is how you check off checklist items."
-  ),
-});
+export const createStepSchema = stepCardSelectorBase
+  .extend({
+    content: z.string().describe(
+      "The to-do step content (required). Keep concise - steps are checklist items. " +
+      "Examples: 'Review PR', 'Update tests', 'Deploy to staging'. " +
+      "Steps are created as incomplete by default."
+    ),
+  })
+  .refine(cardSelectorRefinement, cardSelectorRefinementMessage);
 
-export const deleteStepSchema = z.object({
-  account_slug: accountSlugSchema,
-  card_number: cardNumberSchema,
-  step_id: stepIdSchema,
-});
+export const updateStepSchema = stepCardSelectorBase
+  .extend({
+    step_id: stepIdSchema,
+    content: z.string().optional().describe(
+      "New step content. Omit to keep current content unchanged."
+    ),
+    completed: z.boolean().optional().describe(
+      "Completion status. true = mark as complete/done, false = mark as incomplete/pending. " +
+      "Omit to keep current completion status. This is how you check off checklist items."
+    ),
+  })
+  .refine(cardSelectorRefinement, cardSelectorRefinementMessage);
+
+export const deleteStepSchema = stepCardSelectorBase
+  .extend({ step_id: stepIdSchema })
+  .refine(cardSelectorRefinement, cardSelectorRefinementMessage);
 
 // ============ Golden Card schemas ============
 
