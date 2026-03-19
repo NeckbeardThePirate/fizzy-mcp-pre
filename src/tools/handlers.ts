@@ -267,38 +267,49 @@ export const toolHandlers: Record<string, ToolHandler> = {
 
   // ============ Step (To-Do) Tools ============
   fizzy_get_step: async (client, args) => {
-    return client.getStep(
+    const cardNumber = await resolveCardNumber(
+      client,
       args.account_slug as string,
-      args.card_number as string,
-      args.step_id as string
+      args.card_id as string | undefined,
+      args.card_number as string | undefined
     );
+    return client.getStep(args.account_slug as string, cardNumber, args.step_id as string);
   },
 
   fizzy_create_step: async (client, args) => {
-    return client.createStep(args.account_slug as string, args.card_number as string, {
+    const cardNumber = await resolveCardNumber(
+      client,
+      args.account_slug as string,
+      args.card_id as string | undefined,
+      args.card_number as string | undefined
+    );
+    return client.createStep(args.account_slug as string, cardNumber, {
       description: (args.content || args.description) as string,
     });
   },
 
   fizzy_update_step: async (client, args) => {
-    await client.updateStep(
+    const cardNumber = await resolveCardNumber(
+      client,
       args.account_slug as string,
-      args.card_number as string,
-      args.step_id as string,
-      {
-        description: (args.content || args.description) as string,
-        completed: args.completed as boolean,
-      }
+      args.card_id as string | undefined,
+      args.card_number as string | undefined
     );
+    await client.updateStep(args.account_slug as string, cardNumber, args.step_id as string, {
+      description: (args.content || args.description) as string,
+      completed: args.completed as boolean,
+    });
     return `Step ${args.step_id} updated`;
   },
 
   fizzy_delete_step: async (client, args) => {
-    await client.deleteStep(
+    const cardNumber = await resolveCardNumber(
+      client,
       args.account_slug as string,
-      args.card_number as string,
-      args.step_id as string
+      args.card_id as string | undefined,
+      args.card_number as string | undefined
     );
+    await client.deleteStep(args.account_slug as string, cardNumber, args.step_id as string);
     return `Step ${args.step_id} deleted`;
   },
 
