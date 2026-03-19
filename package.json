@@ -29,8 +29,8 @@
     "unlink:global": "npm unlink -g fizzy-mcp",
     "cf:dev": "wrangler dev",
     "cf:deploy": "echo 'Error: Use cf:deploy:staging or cf:deploy:production' && exit 1",
-    "cf:deploy:staging": "wrangler deploy --env staging",
-    "cf:deploy:production": "wrangler deploy --env production",
+    "cf:deploy:staging": "bash scripts/deploy.sh staging",
+    "cf:deploy:production": "bash scripts/deploy.sh production",
     "cf:tail": "wrangler tail",
     "cf:secret": "wrangler secret put FIZZY_ACCESS_TOKEN"
   },
