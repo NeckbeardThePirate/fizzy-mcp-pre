@@ -284,7 +284,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
       args.card_number as string | undefined
     );
     return client.createStep(args.account_slug as string, cardNumber, {
-      description: (args.content || args.description) as string,
+      content: (args.content || args.description) as string,
     });
   },
 
@@ -296,7 +296,7 @@ export const toolHandlers: Record<string, ToolHandler> = {
       args.card_number as string | undefined
     );
     await client.updateStep(args.account_slug as string, cardNumber, args.step_id as string, {
-      description: (args.content || args.description) as string,
+      content: (args.content || args.description) as string,
       completed: args.completed as boolean,
     });
     return `Step ${args.step_id} updated`;
