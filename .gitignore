@@ -44,3 +44,6 @@ temp/
 # Cloudflare Wrangler local development files
 .dev.vars
 .wrangler/
+
+# Local deployment config (account-specific values, not for upstream)
+wrangler.local.jsonc

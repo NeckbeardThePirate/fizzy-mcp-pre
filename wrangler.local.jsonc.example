@@ -1,0 +1,100 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fizzy-mcp-production",
+  "account_id": "<your-cloudflare-account-id>",
+  "main": "src/cloudflare/index.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+
+  "vars": {
+    "FIZZY_BASE_URL": "https://app.fizzy.do",
+    "LOG_LEVEL": "info",
+    "RATE_LIMIT_RPM": "10000",
+    "ENABLE_CACHE": "true",
+    "ENABLE_RATE_LIMIT": "true"
+  },
+
+  "durable_objects": {
+    "bindings": [
+      { "name": "MCP_SESSIONS", "class_name": "McpSessionDO" },
+      { "name": "RATE_LIMITER", "class_name": "RateLimiterDO" }
+    ]
+  },
+
+  "migrations": [
+    { "tag": "v1", "new_classes": ["McpSessionDO"] },
+    { "tag": "v2", "new_classes": ["RateLimiterDO"] }
+  ],
+
+  "dev": {
+    "port": 8787,
+    "local_protocol": "http"
+  },
+
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  },
+
+  "env": {
+    "production": {
+      "name": "fizzy-mcp-production",
+      "vars": {
+        "FIZZY_BASE_URL": "https://app.fizzy.do",
+        "LOG_LEVEL": "warn",
+        "RATE_LIMIT_RPM": "10000",
+        "ENABLE_CACHE": "true",
+        "ENABLE_RATE_LIMIT": "true"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "MCP_SESSIONS", "class_name": "McpSessionDO" },
+          { "name": "RATE_LIMITER", "class_name": "RateLimiterDO" }
+        ]
+      },
+      "kv_namespaces": [
+        {
+          "binding": "FIZZY_CACHE",
+          "id": "<production-kv-namespace-id>"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "AUDIT_LOGS", "bucket_name": "fizzy-mcp-logs-production" }
+      ],
+      // Uncomment and set your custom domain if you have one proxied through Cloudflare:
+      // "routes": [
+      //   { "pattern": "fizzy.yourdomain.com", "custom_domain": true }
+      // ]
+    },
+    "staging": {
+      "name": "fizzy-mcp-staging",
+      "vars": {
+        "FIZZY_BASE_URL": "https://app.fizzy.do",
+        "LOG_LEVEL": "debug",
+        "RATE_LIMIT_RPM": "10000",
+        "ENABLE_CACHE": "true",
+        "ENABLE_RATE_LIMIT": "true"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "MCP_SESSIONS", "class_name": "McpSessionDO" },
+          { "name": "RATE_LIMITER", "class_name": "RateLimiterDO" }
+        ]
+      },
+      "kv_namespaces": [
+        {
+          "binding": "FIZZY_CACHE",
+          "id": "<staging-kv-namespace-id>"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "AUDIT_LOGS", "bucket_name": "fizzy-mcp-logs-staging" }
+      ],
+      // "routes": [
+      //   { "pattern": "fizzy-staging.yourdomain.com", "custom_domain": true }
+      // ]
+    }
+  }
+}
